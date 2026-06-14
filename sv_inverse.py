@@ -22,6 +22,12 @@ def bayesian_inversion_score(returns, macro_df, prior_vol=0.1, obs_noise=0.05):
     min_len = min(len(returns), len(macro_df))
     returns = returns[:min_len]
     macro_df = macro_df.iloc[:min_len]
+    # Remove NaN rows
+    mask = ~(np.isnan(returns) | np.isnan(macro_df).any(axis=1))
+    returns = returns[mask]
+    macro_df = macro_df[mask]
+    if len(returns) < 20:
+        return 0.0
     # Standardise macro
     scaler = StandardScaler()
     macro_scaled = scaler.fit_transform(macro_df)
@@ -31,6 +37,10 @@ def bayesian_inversion_score(returns, macro_df, prior_vol=0.1, obs_noise=0.05):
     # Use lagged macro to predict current volatility
     X = macro_scaled[:-1]
     y = vol_garch[1:]
+    # Remove any remaining NaN
+    mask2 = ~(np.isnan(y) | np.isnan(X).any(axis=1))
+    X = X[mask2]
+    y = y[mask2]
     if len(y) < 10:
         return 0.0
     ridge = Ridge(alpha=1.0)
@@ -43,5 +53,4 @@ def bayesian_inversion_score(returns, macro_df, prior_vol=0.1, obs_noise=0.05):
         r2 = 0.0
     else:
         r2 = 1 - ss_res / ss_tot
-    # r2 can be negative; clip to [0,1]
     return max(0.0, min(1.0, r2))
